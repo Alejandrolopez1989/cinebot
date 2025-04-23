@@ -3,11 +3,23 @@ import re
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 from database import get_db
+from flask import Flask  # NUEVO: Importar Flask
+from threading import Thread  # NUEVO: Importar Thread
+
+# NUEVO: Configurar servidor Flask
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "¡Bot activo! 🚀"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 COLLECTION = get_db()
 
-# Guardar mensajes principales (portada + hashtag)
+# Función para guardar mensajes del canal
 def save_post(update: Update, context: CallbackContext):
     message = update.channel_post or update.edited_channel_post
 
@@ -16,17 +28,15 @@ def save_post(update: Update, context: CallbackContext):
         if not hashtags:
             return
 
-        # Guardar portada y sinopsis
         post = {
             "hashtags": [tag.lower() for tag in hashtags],
-            "cover": message.photo[-1].file_id,  # Mejor calidad
+            "cover": message.photo[-1].file_id,
             "synopsis": message.caption,
             "files": [],
             "main_message_id": message.message_id
         }
         COLLECTION.insert_one(post)
 
-    # Guardar archivos adjuntos (respuestas al mensaje principal)
     elif message and message.reply_to_message:
         main_post = COLLECTION.find_one({"main_message_id": message.reply_to_message.message_id})
         if not main_post:
@@ -37,8 +47,6 @@ def save_post(update: Update, context: CallbackContext):
             file_info = {"type": "document", "file_id": message.document.file_id}
         elif message.video:
             file_info = {"type": "video", "file_id": message.video.file_id}
-        elif message.audio:
-            file_info = {"type": "audio", "file_id": message.audio.file_id}
 
         if file_info:
             COLLECTION.update_one(
@@ -46,10 +54,10 @@ def save_post(update: Update, context: CallbackContext):
                 {"$push": {"files": file_info}}
             )
 
-# Buscar por hashtag y enviar resultados
+# Función de búsqueda
 def search(update: Update, context: CallbackContext):
     if not context.args:
-        update.message.reply_text("🔍 Usa: /search <hashtag> (ej: /search #Matrix)")
+        update.message.reply_text("🔍 Usa: /search <hashtag>")
         return
 
     hashtag = context.args[0].lower().strip('#')
@@ -60,13 +68,11 @@ def search(update: Update, context: CallbackContext):
         return
 
     for post in results:
-        # Enviar portada y sinopsis
         context.bot.send_photo(
             chat_id=update.effective_chat.id,
             photo=post["cover"],
             caption=post["synopsis"]
         )
-        # Enviar archivos asociados
         for file in post["files"]:
             if file["type"] == "document":
                 context.bot.send_document(update.effective_chat.id, file["file_id"])
@@ -74,6 +80,11 @@ def search(update: Update, context: CallbackContext):
                 context.bot.send_video(update.effective_chat.id, file["file_id"])
 
 def main():
+    # NUEVO: Iniciar Flask en un hilo separado
+    flask_thread = Thread(target=run_flask)
+    flask_thread.start()
+
+    # Iniciar el bot de Telegram
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
