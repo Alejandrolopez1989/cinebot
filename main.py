@@ -92,7 +92,7 @@ def main():
     dp.add_handler(MessageHandler(Filters.update.channel_post, save_post))
 
     # URL de tu servicio en Render (ej: https://cinebot.onrender.com)
-    WEBHOOK_URL = "https://tu-url-en-render.com/" + TOKEN
+    WEBHOOK_URL = "https://cinebot-o0jc.onrender.com" + TOKEN
 
     updater.start_webhook(
         listen="0.0.0.0",
