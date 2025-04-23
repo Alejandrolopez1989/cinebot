@@ -80,25 +80,20 @@ def search(update: Update, context: CallbackContext):
                 context.bot.send_video(update.effective_chat.id, file["file_id"])
 
 def main():
-    # Iniciar Flask en un hilo separado (opcional, si necesitas rutas HTTP)
-    flask_thread = Thread(target=run_flask)
-    flask_thread.start()
-
-    # Configurar webhook
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("search", search, pass_args=True))
     dp.add_handler(MessageHandler(Filters.update.channel_post, save_post))
 
-    # URL de tu servicio en Render (ej: https://cinebot.onrender.com)
-    WEBHOOK_URL = "https://cinebot-o0jc.onrender.com" + TOKEN
-
+    # Webhook sin Flask
+    WEBHOOK_URL = "https://nombre-de-tu-servicio.onrender.com/" + TOKEN
     updater.start_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 10000)),
         url_path=TOKEN,
-        webhook_url=WEBHOOK_URL
+        webhook_url=WEBHOOK_URL,
+        allowed_updates=Update.ALL_TYPES
     )
     updater.idle()
 
